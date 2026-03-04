@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "seraph-ai"
-version = "0.1.0"
+version = "0.1.1"
 description = "Code quality gate — mutation testing, static analysis, and risk scoring for AI-generated code"
 readme = "README.md"
 license = {text = "MIT"}
@@ -27,14 +27,14 @@ dependencies = [
     "typer>=0.9",
     "rich>=13.0",
     "tomli>=2.0; python_version < '3.11'",
+    "mcp>=1.0,<2.0",
 ]
 
 [project.optional-dependencies]
-mcp = ["mcp>=1.0,<2.0"]
 sentinel = ["git-sentinel>=0.4.0"]
 mutation = ["mutmut>=2.4.0"]
 dev = ["pytest>=7.0", "pytest-cov", "ruff", "mypy"]
-all = ["seraph-ai[mcp,sentinel,mutation]"]
+all = ["seraph-ai[sentinel,mutation]"]
 
 [project.scripts]
 seraph = "seraph.cli.app:app"

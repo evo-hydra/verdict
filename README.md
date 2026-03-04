@@ -15,7 +15,6 @@ With optional tools:
 ```bash
 pip install "seraph-ai[mutation]"   # mutmut for mutation testing
 pip install "seraph-ai[sentinel]"   # git-sentinel for risk signals
-pip install "seraph-ai[mcp]"        # MCP server for AI assistants
 pip install "seraph-ai[all]"        # everything
 ```
 
