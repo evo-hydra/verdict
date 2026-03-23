@@ -19,11 +19,12 @@ from seraph.models.enums import AnalyzerType, Grade, MutantStatus, Severity
 
 
 class TestSeraphEngine:
-    def test_empty_diff_returns_perfect(self, store: SeraphStore, tmp_repo: Path):
+    def test_empty_diff_is_vacuous(self, store: SeraphStore, tmp_repo: Path):
         engine = SeraphEngine(store, skip_baseline=True, skip_mutations=True)
         report = engine.assess(tmp_repo)
-        assert report.overall_grade == Grade.A
-        assert report.overall_score == 100.0
+        assert report.overall_grade == Grade.VACUOUS
+        assert report.overall_score == 0.0
+        assert report.is_vacuous is True
         assert report.files_changed == []
         assert all(not d.evaluated for d in report.dimensions)
 
@@ -148,8 +149,8 @@ class TestSeraphEngine:
         )
         engine = SeraphEngine(store, config=config, skip_baseline=True, skip_mutations=True)
         report = engine.assess(tmp_repo)
-        # Should still work (empty diff = grade A)
-        assert report.overall_grade == Grade.A
+        # Empty diff = vacuous grade (no dimensions evaluated)
+        assert report.overall_grade == Grade.VACUOUS
 
     @patch("seraph.core.engine.run_security_analysis")
     @patch("seraph.core.engine.run_static_analysis")

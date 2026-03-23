@@ -136,8 +136,9 @@ class TestEndToEnd:
             report = engine.assess(repo)
 
         assert report.files_changed == []
-        assert report.overall_grade == Grade.A
-        assert report.overall_score == 100.0
+        assert report.overall_grade == Grade.VACUOUS
+        assert report.overall_score == 0.0
+        assert report.is_vacuous is True
 
     def test_feedback_round_trip(self, tmp_path: Path):
         """Can submit feedback and retrieve it."""

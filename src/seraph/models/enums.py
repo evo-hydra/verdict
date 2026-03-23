@@ -13,6 +13,7 @@ class Grade(str, Enum):
     C = "C"
     D = "D"
     F = "F"
+    VACUOUS = "VACUOUS"
 
     @classmethod
     def from_score(

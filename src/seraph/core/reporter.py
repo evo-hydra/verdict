@@ -240,11 +240,11 @@ def build_report(
         if total_weight > 0:
             overall_score = sum(d.raw_score * (d.weight / total_weight) for d in evaluated_dims)
         else:
-            overall_score = 100.0
+            overall_score = 0.0
+        overall_grade = Grade.from_score(overall_score, thresholds)
     else:
-        overall_score = 100.0
-
-    overall_grade = Grade.from_score(overall_score, thresholds)
+        overall_score = 0.0
+        overall_grade = Grade.VACUOUS
     gaps = _identify_gaps(dimensions)
 
     return AssessmentReport(

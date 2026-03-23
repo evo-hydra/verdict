@@ -171,6 +171,11 @@ class AssessmentReport:
     sentinel_signals: SentinelSignals = field(default_factory=SentinelSignals)
     created_at: str = field(default_factory=_utcnow)
 
+    @property
+    def is_vacuous(self) -> bool:
+        """True when no dimensions were evaluated — grade is meaningless."""
+        return self.overall_grade == Grade.VACUOUS
+
     def to_dict(self) -> dict:
         """Serialize to a JSON-compatible dict."""
         return {
@@ -199,6 +204,7 @@ class AssessmentReport:
             "baseline_flaky": self.baseline_flaky,
             "security_issues": len(self.security_findings),
             "gaps": self.gaps,
+            "is_vacuous": self.is_vacuous,
             "evaluated_count": sum(1 for d in self.dimensions if d.evaluated),
             "dimension_count": len(self.dimensions),
             "created_at": self.created_at,
