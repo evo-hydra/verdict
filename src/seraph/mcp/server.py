@@ -47,6 +47,7 @@ def create_server():
         ref_after: str = "",
         skip_baseline: bool = False,
         skip_mutations: bool = False,
+        repo_root: str = "",
     ) -> str:
         """Run full assessment pipeline on current diff or specified refs.
 
@@ -58,8 +59,9 @@ def create_server():
             ref_after: Git ref after changes (default: working tree)
             skip_baseline: Skip flakiness baseline (faster)
             skip_mutations: Skip mutation testing (much faster)
+            repo_root: Explicit repo path (use when CWD doesn't match git root)
         """
-        repo_path = _get_repo_path()
+        repo_path = Path(repo_root).resolve() if repo_root else _get_repo_path()
         config = SeraphConfig.load(repo_path)
         try:
             with _get_store(repo_path, config) as store:
@@ -84,6 +86,7 @@ def create_server():
     def seraph_mutate(
         ref_before: str = "",
         ref_after: str = "",
+        repo_root: str = "",
     ) -> str:
         """Run mutation testing only on changed files.
 
@@ -93,8 +96,9 @@ def create_server():
         Args:
             ref_before: Git ref before changes (default: HEAD)
             ref_after: Git ref after changes (default: working tree)
+            repo_root: Explicit repo path (use when CWD doesn't match git root)
         """
-        repo_path = _get_repo_path()
+        repo_path = Path(repo_root).resolve() if repo_root else _get_repo_path()
         config = SeraphConfig.load(repo_path)
         try:
             with _get_store(repo_path, config) as store:
