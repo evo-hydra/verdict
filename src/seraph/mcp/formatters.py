@@ -13,6 +13,13 @@ def format_assessment(report_dict: dict, *, max_chars: int = MAX_OUTPUT_CHARS) -
     lines.append(f"## Seraph Assessment: {report_dict.get('overall_grade', '?')}")
     lines.append(f"Score: {report_dict.get('overall_score', 0)}/100")
     lines.append(f"Files: {len(report_dict.get('files_changed', []))}")
+
+    dim_count = report_dict.get("dimension_count", 6)
+    evaluated = report_dict.get("evaluated_count", dim_count)
+    if evaluated == 0:
+        lines.append("WARNING: No dimensions evaluated — grade is vacuous")
+    elif evaluated < dim_count:
+        lines.append(f"Evaluated: {evaluated}/{dim_count} dimensions")
     lines.append("")
 
     # Dimensions

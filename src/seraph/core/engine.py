@@ -251,6 +251,7 @@ class SeraphEngine:
             static_findings=[],
             baseline=None,
             sentinel_signals=SentinelSignals(),
+            evaluated_dimensions=set(),  # Nothing was tested
             scoring=self._config.scoring,
             mutation_tool_available=False,
         )

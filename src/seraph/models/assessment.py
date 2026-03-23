@@ -199,6 +199,8 @@ class AssessmentReport:
             "baseline_flaky": self.baseline_flaky,
             "security_issues": len(self.security_findings),
             "gaps": self.gaps,
+            "evaluated_count": sum(1 for d in self.dimensions if d.evaluated),
+            "dimension_count": len(self.dimensions),
             "created_at": self.created_at,
         }
 

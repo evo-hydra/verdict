@@ -25,6 +25,7 @@ class TestSeraphEngine:
         assert report.overall_grade == Grade.A
         assert report.overall_score == 100.0
         assert report.files_changed == []
+        assert all(not d.evaluated for d in report.dimensions)
 
     def test_empty_diff_is_persisted(self, store: SeraphStore, tmp_repo: Path):
         engine = SeraphEngine(store, skip_baseline=True, skip_mutations=True)
