@@ -140,6 +140,22 @@ class TestEndToEnd:
         assert report.overall_score == 0.0
         assert report.is_vacuous is True
 
+    def test_assess_from_subdirectory_with_repo_root(self, tmp_path: Path):
+        """Assessing from a subdirectory with explicit repo_root finds the diff."""
+        repo = _make_git_repo(tmp_path)
+        db_path = repo / ".seraph" / "seraph.db"
+        subdir = repo / "subdir"
+        subdir.mkdir()
+
+        with SeraphStore(db_path) as store:
+            engine = SeraphEngine(store, skip_baseline=True, skip_mutations=True)
+            # Assess from repo root — should find the diff (file was changed in _make_git_repo)
+            report = engine.assess(repo, ref_before="HEAD~1")
+
+        # With the change from _make_git_repo, this should NOT be vacuous
+        assert not report.is_vacuous
+        assert len(report.files_changed) > 0
+
     def test_feedback_round_trip(self, tmp_path: Path):
         """Can submit feedback and retrieve it."""
         repo = _make_git_repo(tmp_path)

@@ -28,6 +28,15 @@ class TestSeraphEngine:
         assert report.files_changed == []
         assert all(not d.evaluated for d in report.dimensions)
 
+    def test_vacuous_report_to_dict(self, store: SeraphStore, tmp_repo: Path):
+        engine = SeraphEngine(store, skip_baseline=True, skip_mutations=True)
+        report = engine.assess(tmp_repo)
+        d = report.to_dict()
+        assert d["is_vacuous"] is True
+        assert d["overall_grade"] == "VACUOUS"
+        assert d["overall_score"] == 0.0
+        assert d["evaluated_count"] == 0
+
     def test_empty_diff_is_persisted(self, store: SeraphStore, tmp_repo: Path):
         engine = SeraphEngine(store, skip_baseline=True, skip_mutations=True)
         report = engine.assess(tmp_repo)

@@ -51,6 +51,38 @@ class TestFormatAssessment:
         assert "90.0%" in output
         assert "N/A (not evaluated)" in output
 
+    def test_vacuous_returns_error_message(self):
+        report = {
+            "id": "vac12345",
+            "is_vacuous": True,
+            "overall_grade": "VACUOUS",
+            "overall_score": 0.0,
+            "files_changed": [],
+            "evaluated_count": 0,
+            "dimension_count": 6,
+        }
+        output = format_assessment(report)
+        assert "VACUOUS" in output
+        assert "0 dimensions evaluated" in output
+        assert "SERAPH_UNAVAILABLE" in output
+        assert "vac12345" in output
+        # Should NOT contain normal grade card elements
+        assert "Score:" not in output
+        assert "### Dimensions" not in output
+
+    def test_non_vacuous_shows_normal_card(self):
+        report = {
+            "id": "ok12345",
+            "is_vacuous": False,
+            "overall_grade": "B",
+            "overall_score": 78.0,
+            "files_changed": ["foo.py"],
+            "dimensions": [],
+        }
+        output = format_assessment(report)
+        assert "## Seraph Assessment: B" in output
+        assert "78.0/100" in output
+
     def test_malformed_dimension_uses_defaults(self):
         report = {
             "overall_grade": "?",
