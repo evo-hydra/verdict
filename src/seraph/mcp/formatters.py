@@ -8,6 +8,20 @@ MAX_OUTPUT_CHARS = 16_000
 
 def format_assessment(report_dict: dict, *, max_chars: int = MAX_OUTPUT_CHARS) -> str:
     """Format an assessment report for LLM consumption."""
+    # Early return for vacuous assessments — no grade card, hard error
+    if report_dict.get("is_vacuous", False):
+        return (
+            "## Seraph Assessment: VACUOUS\n\n"
+            "**0 dimensions evaluated. No files in diff.**\n\n"
+            "Seraph cannot grade this change. "
+            "Treat as SERAPH_UNAVAILABLE.\n\n"
+            "Common causes:\n"
+            "- No changes between ref_before and ref_after\n"
+            "- Wrong repo_root (CWD doesn't match git root)\n"
+            "- Changes not staged (`git add` before assess)\n\n"
+            f"ID: {report_dict.get('id', '?')}"
+        )
+
     lines: list[str] = []
 
     lines.append(f"## Seraph Assessment: {report_dict.get('overall_grade', '?')}")
@@ -16,9 +30,7 @@ def format_assessment(report_dict: dict, *, max_chars: int = MAX_OUTPUT_CHARS) -
 
     dim_count = report_dict.get("dimension_count", 6)
     evaluated = report_dict.get("evaluated_count", dim_count)
-    if evaluated == 0:
-        lines.append("WARNING: No dimensions evaluated — grade is vacuous")
-    elif evaluated < dim_count:
+    if evaluated < dim_count:
         lines.append(f"Evaluated: {evaluated}/{dim_count} dimensions")
     lines.append("")
 
