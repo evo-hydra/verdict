@@ -76,7 +76,7 @@ class SeraphEngine:
         scoring = self._config.scoring
 
         # Step 1: Diff
-        diff = parse_diff(repo, ref_before, ref_after)
+        diff = parse_diff(repo, ref_before, ref_after, timeout=self._config.timeouts.diff)
         py_files = diff.python_files
         all_files = diff.file_paths
 
@@ -201,7 +201,7 @@ class SeraphEngine:
         marked as not evaluated and excluded from the overall score.
         """
         repo = Path(repo_path).resolve()
-        diff = parse_diff(repo, ref_before, ref_after)
+        diff = parse_diff(repo, ref_before, ref_after, timeout=self._config.timeouts.diff)
         py_files = diff.python_files
 
         mutations: list = []

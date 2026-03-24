@@ -45,7 +45,12 @@ _NEW_FILE_RE = re.compile(r"^new file mode")
 _DEL_FILE_RE = re.compile(r"^deleted file mode")
 
 
-def parse_diff(repo_path: Path, ref_before: str | None = None, ref_after: str | None = None) -> DiffResult:
+def parse_diff(
+    repo_path: Path,
+    ref_before: str | None = None,
+    ref_after: str | None = None,
+    timeout: int = 30,
+) -> DiffResult:
     """Parse git diff and return structured file changes.
 
     If no refs given, diffs HEAD against working tree (staged + unstaged).
@@ -66,7 +71,7 @@ def parse_diff(repo_path: Path, ref_before: str | None = None, ref_after: str | 
             cwd=str(repo_path),
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=timeout,
         )
 
         # If HEAD doesn't exist yet (fresh repo), fall back to diff of staged files
@@ -76,7 +81,7 @@ def parse_diff(repo_path: Path, ref_before: str | None = None, ref_after: str | 
                 cwd=str(repo_path),
                 capture_output=True,
                 text=True,
-                timeout=30,
+                timeout=timeout,
             )
     except subprocess.TimeoutExpired:
         logger.debug("git diff timed out for %s", repo_path)
