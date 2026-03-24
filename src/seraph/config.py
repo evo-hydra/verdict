@@ -5,9 +5,12 @@ Loads from .seraph/config.toml -> env vars -> defaults.
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass, fields
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 try:
     import tomllib  # Python 3.11+
@@ -176,7 +179,9 @@ def _build_section(cls: type, toml_dict: dict, env_prefix: str):
         env_val = os.environ.get(env_key)
 
         if env_val is not None:
-            kwargs[f.name] = _coerce(env_val, f.type)
+            coerced = _coerce(env_val, f.type, env_key)
+            if coerced is not None:
+                kwargs[f.name] = coerced
         elif f.name in toml_dict:
             val = toml_dict[f.name]
             # TOML arrays arrive as lists; coerce to tuple for frozen dataclasses
@@ -188,12 +193,20 @@ def _build_section(cls: type, toml_dict: dict, env_prefix: str):
     return cls(**kwargs)
 
 
-def _coerce(value: str, type_hint: str):
+def _coerce(value: str, type_hint: str, env_key: str = ""):
     """Coerce a string env var value to the appropriate type."""
     if type_hint == "bool":
         return value.lower() in ("true", "1", "yes")
     if type_hint == "int":
-        return int(value)
+        try:
+            return int(value)
+        except (ValueError, TypeError):
+            logger.warning("Invalid int for %s: %r — ignoring env override", env_key, value)
+            return None  # caller will fall through to TOML/default
     if type_hint == "float":
-        return float(value)
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            logger.warning("Invalid float for %s: %r — ignoring env override", env_key, value)
+            return None
     return value
