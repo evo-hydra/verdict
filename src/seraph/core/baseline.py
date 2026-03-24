@@ -38,10 +38,12 @@ def run_baseline(
         if 0 < fail_count < run_count:
             flaky.append(test_id)
 
-    # Calculate overall pass rate
+    # Calculate overall pass rate among tests that failed at least once.
+    # 0.0 = every failing test fails every run (deterministic failures).
+    # 1.0 = no tests failed at all.
+    # Values between indicate flakiness (tests fail intermittently).
     total_results = sum(len(f) for f in all_failures)
     if all_test_ids:
-        # pass_rate = 1 - (average failures per run / total unique tests seen)
         avg_failures = total_results / run_count
         pass_rate = max(0.0, 1.0 - (avg_failures / max(len(all_test_ids), 1)))
     else:
