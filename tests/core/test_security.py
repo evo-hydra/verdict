@@ -401,6 +401,60 @@ class TestFilterFindings:
         result = _filter_findings([finding], self._config())
         assert result == []
 
+    def test_drops_hardcoded_subprocess_cwe78(self):
+        """B603 with hardcoded string list should be dropped."""
+        finding = SecurityFinding(
+            code="B603", cwe_id="CWE-78",
+            source_line='subprocess.run(["ruff", "--select", "F401"])',
+        )
+        result = _filter_findings([finding], self._config())
+        assert result == []
+
+    def test_drops_hardcoded_git_command_cwe78(self):
+        """B603 with hardcoded git command should be dropped."""
+        finding = SecurityFinding(
+            code="B603", cwe_id="CWE-78",
+            source_line="safe_git_command(['rev-list', '--count', 'HEAD'])",
+        )
+        result = _filter_findings([finding], self._config())
+        assert result == []
+
+    def test_keeps_variable_subprocess_cwe78(self):
+        """B603 with variable args should be kept."""
+        finding = SecurityFinding(
+            code="B603", cwe_id="CWE-78",
+            source_line="subprocess.run([cmd, arg1, arg2])",
+        )
+        result = _filter_findings([finding], self._config())
+        assert len(result) == 1
+
+    def test_keeps_fstring_subprocess_cwe78(self):
+        """B602 with f-string should be kept."""
+        finding = SecurityFinding(
+            code="B602", cwe_id="CWE-78",
+            source_line='subprocess.run(f"rm -rf {path}", shell=True)',
+        )
+        result = _filter_findings([finding], self._config())
+        assert len(result) == 1
+
+    def test_drops_b607_hardcoded_partial_path_cwe78(self):
+        """B607 with hardcoded partial path in list should be dropped."""
+        finding = SecurityFinding(
+            code="B607", cwe_id="CWE-78",
+            source_line='subprocess.Popen(["mypy", "--strict", "src/"])',
+        )
+        result = _filter_findings([finding], self._config())
+        assert result == []
+
+    def test_keeps_mixed_list_cwe78(self):
+        """B603 with mix of hardcoded and variable args should be kept."""
+        finding = SecurityFinding(
+            code="B603", cwe_id="CWE-78",
+            source_line='subprocess.run(["ruff", file_path])',
+        )
+        result = _filter_findings([finding], self._config())
+        assert len(result) == 1
+
     def test_default_bandit_skip_drops_b101_b110(self):
         """Default config skips B101 (assert) and B110 (try/except/pass)."""
         findings = [

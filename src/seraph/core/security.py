@@ -298,6 +298,18 @@ def _run_detect_secrets(
 # Bandit test IDs for hardcoded password checks (CWE-259)
 _CWE259_CODES = frozenset({"B105", "B106", "B107"})
 
+# Bandit test IDs for OS command injection (CWE-78)
+_CWE78_CODES = frozenset({"B602", "B603", "B604", "B605", "B606", "B607", "B609"})
+
+# Subprocess calls with ONLY hardcoded string literals in a list are safe.
+# Matches: subprocess.run(["ruff", "--select", "F401"]) or ["git", "rev-list"]
+# Rejects: subprocess.run([cmd, arg]) or subprocess.run(f"rm {path}")
+_CWE78_HARDCODED_LIST_RE = re.compile(
+    r"\["                   # opening bracket
+    r"(?:\s*[\"'][^\"']*[\"']\s*,?\s*)*"  # zero or more quoted string literals
+    r"\]"                   # closing bracket
+)
+
 # Patterns in source_line that indicate non-hardcoded-credential contexts:
 # comparison checks, dict lookups, env reads, empty/None defaults
 _CWE259_FP_RE = re.compile(
@@ -358,6 +370,12 @@ def _filter_findings(
         # CWE-259 suppression: drop B105/B106/B107 where source indicates
         # non-credential context (comparisons, lookups, empty defaults, etc.)
         if f.code in _CWE259_CODES and _CWE259_FP_RE.search(f.source_line):
+            continue
+
+        # CWE-78 suppression: drop B602-B607/B609 where the source line
+        # contains only hardcoded string literals in a list (internal tool
+        # invocations like subprocess.run(["ruff", "--select", "F401"]))
+        if f.code in _CWE78_CODES and _CWE78_HARDCODED_LIST_RE.search(f.source_line):
             continue
 
         # CWE-330 non-crypto suppression: drop B311 in demo/test files or
