@@ -11,3 +11,4 @@ build/
 .mcp.json
 .env
 .coverage
+.sentinel/
