@@ -26,6 +26,7 @@ from seraph.models.assessment import (
     AssessmentReport,
     SentinelSignals,
 )
+from seraph.models.enums import MutantStatus
 
 logger = logging.getLogger(__name__)
 
@@ -107,11 +108,15 @@ class SeraphEngine:
                 mutation_run = run_mutations(repo, py_files, self._mutation_timeout)
                 mutations = mutation_run.results
                 mutation_tool_available = mutation_run.tool_available
-                if mutations:  # Only mark evaluated if we got actual results
-                    mutation_score = compute_mutation_score(mutations)
+                # Filter out TIMEOUT results — they indicate tool failure, not real data
+                real_mutations = [
+                    m for m in mutations if m.status != MutantStatus.TIMEOUT
+                ]
+                if real_mutations:  # Only mark evaluated if we got actual results
+                    mutation_score = compute_mutation_score(real_mutations)
                     evaluated.add("mutation")
-                # No results + tool available = N/A (no mutable code), weight redistributed
-                # No results + tool unavailable = N/A, weight redistributed
+                # No real results + tool available = N/A (no mutable code or timeout)
+                # No real results + tool unavailable = N/A, weight redistributed
             except Exception:
                 logger.exception("Step 3 (Mutation) failed")
 
