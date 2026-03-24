@@ -85,8 +85,11 @@ class SeraphEngine:
             self._store.save_assessment(report)
             return report
 
-        # Track which dimensions are actually evaluated
-        evaluated = {"static", "sentinel_risk", "co_change"}
+        # Track which dimensions are actually evaluated — start empty,
+        # add only after successful computation. Pre-populating inflates
+        # grades when a step throws (the dimension stays "evaluated" with
+        # its 100.0 default).
+        evaluated: set[str] = set()
 
         # Step 2: Baseline
         baseline = None
@@ -132,6 +135,7 @@ class SeraphEngine:
                 # Only score findings from configured tools
                 scoreable = [f for f in static_findings if tool_config.get(f.analyzer.value, True)]
                 static_score = compute_static_score(scoreable, len(py_files), scoring)
+                evaluated.add("static")
             except Exception:
                 logger.exception("Step 4 (Static Analysis) failed")
 
@@ -155,6 +159,8 @@ class SeraphEngine:
         try:
             with SentinelBridge(repo) as bridge:
                 sentinel_signals = bridge.get_risk_signals(all_files)
+            evaluated.add("sentinel_risk")
+            evaluated.add("co_change")
         except Exception:
             logger.exception("Step 5 (Sentinel) failed")
 

@@ -99,10 +99,10 @@ class TestSeraphEngine:
         evaluated_names = {d.name for d in report.dimensions if d.evaluated}
         assert "Mutation Score" not in evaluated_names
         assert "Test Baseline" not in evaluated_names
-        # Static, sentinel, co-change should still be evaluated
+        # Static should be evaluated (py_files exist, ruff/mypy run)
         assert "Static Cleanliness" in evaluated_names
-        assert "Sentinel Risk" in evaluated_names
-        assert "Co-change Coverage" in evaluated_names
+        # Sentinel/co-change only evaluated if .sentinel/ exists in tmp_repo
+        # (they may or may not be — depends on test fixture)
 
     @patch("seraph.core.engine.run_static_analysis")
     @patch("seraph.core.engine.parse_diff")
@@ -300,3 +300,51 @@ class TestSeraphEngine:
         # 100 / (1 + 1/10) = 90.9
         static_dim = next(d for d in report.dimensions if d.name == "Static Cleanliness")
         assert static_dim.raw_score == 90.9
+
+    @patch("seraph.core.engine.SentinelBridge")
+    @patch("seraph.core.engine.run_security_analysis")
+    @patch("seraph.core.engine.run_static_analysis")
+    @patch("seraph.core.engine.parse_diff")
+    def test_sentinel_failure_excludes_risk_dimensions(
+        self, mock_diff, mock_static, mock_security, mock_bridge,
+        store: SeraphStore, tmp_repo: Path
+    ):
+        """Sentinel failure should NOT inflate grade with phantom 100% scores."""
+        mock_diff.return_value = DiffResult(
+            files=[FileChange(path="src/foo.py")],
+        )
+        mock_static.return_value = StaticRunResult(findings=[], tool_config={"ruff": False, "mypy": False})
+        mock_security.return_value = SecurityRunResult(findings=[], tools_available={"bandit": True})
+        # Sentinel throws
+        mock_bridge.return_value.__enter__ = lambda s: s
+        mock_bridge.return_value.__exit__ = lambda s, *a: None
+        mock_bridge.return_value.get_risk_signals.side_effect = RuntimeError("no .sentinel/")
+
+        engine = SeraphEngine(store, skip_baseline=True, skip_mutations=True)
+        report = engine.assess(tmp_repo)
+
+        evaluated_names = {d.name for d in report.dimensions if d.evaluated}
+        # Sentinel Risk and Co-change should NOT be evaluated
+        assert "Sentinel Risk" not in evaluated_names
+        assert "Co-change Coverage" not in evaluated_names
+        # Static and Security should still be evaluated
+        assert "Static Cleanliness" in evaluated_names
+        assert "Security" in evaluated_names
+
+    @patch("seraph.core.engine.run_static_analysis")
+    @patch("seraph.core.engine.parse_diff")
+    def test_static_failure_excludes_static_dimension(
+        self, mock_diff, mock_static,
+        store: SeraphStore, tmp_repo: Path
+    ):
+        """Static analysis failure should not mark static as evaluated."""
+        mock_diff.return_value = DiffResult(
+            files=[FileChange(path="src/foo.py")],
+        )
+        mock_static.side_effect = RuntimeError("ruff not found")
+
+        engine = SeraphEngine(store, skip_baseline=True, skip_mutations=True)
+        report = engine.assess(tmp_repo)
+
+        evaluated_names = {d.name for d in report.dimensions if d.evaluated}
+        assert "Static Cleanliness" not in evaluated_names
