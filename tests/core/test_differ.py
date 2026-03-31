@@ -91,6 +91,41 @@ class TestParseDiffGit:
         paths = result.file_paths
         assert "hello.py" in paths
 
+    def test_parse_diff_staged_only_changes(self, tmp_repo):
+        """Staged changes (git add without commit) are detected.
+
+        This was the root cause of Seraph returning VACUOUS when the
+        protocol calls git add before seraph_assess — git diff HEAD
+        only shows unstaged changes, missing staged ones entirely.
+        """
+        from tests.conftest import _git
+
+        # Make a change and stage it (but don't commit)
+        (tmp_repo / "test.py").write_text("def hello():\n    return 'world'\n")
+        _git(tmp_repo, "add", "test.py")
+
+        # parse_diff with no refs should find the staged change
+        result = parse_diff(tmp_repo)
+        assert len(result.files) >= 1
+        paths = result.file_paths
+        assert "test.py" in paths
+
+    def test_parse_diff_staged_with_ref_before(self, tmp_repo):
+        """Staged changes are found even when ref_before is specified."""
+        from tests.conftest import _git
+
+        base_sha = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=str(tmp_repo), capture_output=True, text=True,
+        ).stdout.strip()
+
+        (tmp_repo / "new_file.py").write_text("x = 1\n")
+        _git(tmp_repo, "add", "new_file.py")
+
+        result = parse_diff(tmp_repo, ref_before=base_sha)
+        paths = result.file_paths
+        assert "new_file.py" in paths
+
     @patch("seraph.core.differ.subprocess.run")
     def test_parse_diff_timeout_returns_empty(self, mock_run, tmp_path):
         """TimeoutExpired returns an empty DiffResult."""

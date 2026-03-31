@@ -32,11 +32,13 @@ class DiffResult:
 
     @property
     def file_paths(self) -> list[str]:
-        return [f.path for f in self.files]
+        return list(dict.fromkeys(f.path for f in self.files))
 
     @property
     def python_files(self) -> list[str]:
-        return [f.path for f in self.files if f.path.endswith(".py")]
+        return list(dict.fromkeys(
+            f.path for f in self.files if f.path.endswith(".py")
+        ))
 
 
 _HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
@@ -74,7 +76,7 @@ def parse_diff(
             timeout=timeout,
         )
 
-        # If HEAD doesn't exist yet (fresh repo), fall back to diff of staged files
+        # If HEAD doesn't exist yet (fresh repo), fall back to staged files
         if result.returncode != 0 and "HEAD" in result.stderr:
             result = subprocess.run(
                 ["git", "diff", "--unified=0", "--cached"],
@@ -83,6 +85,33 @@ def parse_diff(
                 text=True,
                 timeout=timeout,
             )
+
+        # Also check staged changes and merge with unstaged.
+        # git diff HEAD only shows unstaged changes — staged files
+        # (added with git add) won't appear without --cached.
+        # Only needed when diffing against working tree (no ref_after),
+        # since ref_before..ref_after diffs committed state directly.
+        if result.returncode == 0 and not ref_after:
+            staged = subprocess.run(
+                ["git", "diff", "--unified=0", "--cached"]
+                + ([ref_before] if ref_before else []),
+                cwd=str(repo_path),
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+            if staged.stdout.strip():
+                # Merge: if primary was empty, use staged; otherwise concatenate
+                if not result.stdout.strip():
+                    result = staged
+                else:
+                    result = subprocess.CompletedProcess(
+                        args=result.args,
+                        returncode=0,
+                        stdout=result.stdout + staged.stdout,
+                        stderr=result.stderr,
+                    )
+
     except subprocess.TimeoutExpired:
         logger.debug("git diff timed out for %s", repo_path)
         return DiffResult(ref_before=ref_before, ref_after=ref_after)

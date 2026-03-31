@@ -65,6 +65,10 @@ class ScoringConfig:
     # Security analysis thresholds
     security_issue_threshold: float = 5.0
 
+    # Minimum dimensions that must evaluate for a passing grade.
+    # If fewer evaluate, grade is capped at D regardless of score.
+    min_evaluated_dimensions: int = 3
+
     @property
     def dimension_weights(self) -> dict[str, float]:
         return {

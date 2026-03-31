@@ -232,6 +232,7 @@ def build_report(
 
     # Overall score only considers evaluated dimensions, re-weighted
     evaluated_dims = [d for d in dimensions if d.evaluated]
+    min_dimensions = scoring.min_evaluated_dimensions if scoring else 3
     if evaluated_dims:
         total_weight = sum(d.weight for d in evaluated_dims)
         if total_weight > 0:
@@ -239,6 +240,14 @@ def build_report(
         else:
             overall_score = 0.0
         overall_grade = Grade.from_score(overall_score, thresholds)
+        # Cap at D when too few dimensions evaluated — insufficient
+        # evidence to trust a passing grade.
+        if len(evaluated_dims) < min_dimensions and overall_grade in (Grade.A, Grade.B, Grade.C):
+            logger.warning(
+                "Only %d/%d dimensions evaluated — grade capped at D (was %s)",
+                len(evaluated_dims), len(all_dims), overall_grade.value,
+            )
+            overall_grade = Grade.D
     else:
         overall_score = 0.0
         overall_grade = Grade.VACUOUS
