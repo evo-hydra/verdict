@@ -1,4 +1,8 @@
-"""Multi-metric report generation with 6-dimension scoring.
+"""Tier 3 report generation — background learning signal only.
+
+Computes multi-metric scores across 6 dimensions for retrospective
+analysis. NOT used as a gate (gates are in checks.py and gate.py).
+Individual score functions (compute_*_score) are reused by Tier 1/2.
 
 All scoring logic is consolidated here — baseline, mutation, static,
 security, sentinel risk, and co-change coverage scores are all computed
@@ -240,14 +244,16 @@ def build_report(
         else:
             overall_score = 0.0
         overall_grade = Grade.from_score(overall_score, thresholds)
-        # Cap at D when too few dimensions evaluated — insufficient
-        # evidence to trust a passing grade.
-        if len(evaluated_dims) < min_dimensions and overall_grade in (Grade.A, Grade.B, Grade.C):
+        # When too few dimensions evaluated, mark as INCOMPLETE rather
+        # than capping at D. D implies "bad code" — INCOMPLETE means
+        # "can't assess." This prevents config-only changes (JSON, YAML)
+        # from getting scary grades that train operators to ignore Seraph.
+        if len(evaluated_dims) < min_dimensions:
             logger.warning(
-                "Only %d/%d dimensions evaluated — grade capped at D (was %s)",
-                len(evaluated_dims), len(all_dims), overall_grade.value,
+                "Only %d/%d dimensions evaluated — grade set to INCOMPLETE (score was %.1f, grade was %s)",
+                len(evaluated_dims), len(all_dims), overall_score, overall_grade.value,
             )
-            overall_grade = Grade.D
+            overall_grade = Grade.INCOMPLETE
     else:
         overall_score = 0.0
         overall_grade = Grade.VACUOUS

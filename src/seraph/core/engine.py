@@ -1,4 +1,15 @@
-"""SeraphEngine — 7-step assessment pipeline."""
+"""SeraphEngine — Tier 3 background analysis (learning signal only).
+
+This engine was the original Seraph assessment pipeline (v1). It is
+now demoted to Tier 3: it runs expensive analysis (full mutation suite,
+deep static analysis) as an opt-in background learning signal, NOT
+as a gate. Gate enforcement lives in checks.py (Tier 1) and gate.py
+(Tier 2).
+
+The engine's results feed into Tier 1/2 rule calibration: if Tier 3
+discovers a vulnerability class repeatedly, Tier 1 gets a new check
+for that class.
+"""
 
 from __future__ import annotations
 
