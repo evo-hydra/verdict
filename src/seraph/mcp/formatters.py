@@ -133,6 +133,38 @@ def format_mutations(
     return _truncate("\n".join(lines), max_chars=max_chars)
 
 
+def format_check_result(
+    result, *, max_chars: int = MAX_OUTPUT_CHARS
+) -> str:
+    """Format a Tier 1 check result for LLM consumption.
+
+    Accepts a CheckResult dataclass.
+    """
+    lines: list[str] = []
+
+    if not result.findings:
+        lines.append(f"## Seraph Check: {result.verdict.value}")
+        lines.append("")
+        lines.append("No findings.")
+        return "\n".join(lines)
+
+    lines.append(f"## Seraph Check: {result.verdict.value}")
+    lines.append(f"Findings: {len(result.findings)}")
+    lines.append("")
+
+    for f in result.findings:
+        lines.append(
+            f"- **{f.check.value}** | `{f.file}:{f.line}` | "
+            f"confidence={f.confidence:.0%}"
+        )
+        lines.append(f"  {f.description}")
+        if f.suggestion:
+            lines.append(f"  → {f.suggestion}")
+        lines.append("")
+
+    return _truncate("\n".join(lines), max_chars=max_chars)
+
+
 def format_feedback_response(assessment_id: str, outcome: str) -> str:
     """Format feedback confirmation."""
     return f"Feedback recorded: {outcome} for assessment {assessment_id[:8]}"

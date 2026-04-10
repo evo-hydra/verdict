@@ -9,10 +9,12 @@ from datetime import datetime, timezone
 
 from seraph.models.enums import (
     AnalyzerType,
+    CheckCategory,
     FeedbackOutcome,
     Grade,
     MutantStatus,
     Severity,
+    Verdict,
 )
 
 
@@ -22,6 +24,48 @@ def _utcnow() -> str:
 
 def _new_id() -> str:
     return uuid.uuid4().hex
+
+
+# ── Tier 1 Check Types ──────────────────────────────────────────
+
+
+@dataclass
+class CheckFinding:
+    """A single finding from a Tier 1 fast check."""
+
+    check: CheckCategory = CheckCategory.SECURITY_SURFACE
+    file: str = ""
+    line: int = 0
+    description: str = ""
+    suggestion: str = ""
+    confidence: float = 0.9
+
+
+@dataclass
+class CheckResult:
+    """Result of Tier 1 pre-write checks."""
+
+    verdict: Verdict = Verdict.ALLOW
+    findings: list[CheckFinding] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        return {
+            "verdict": self.verdict.value,
+            "findings": [
+                {
+                    "check": f.check.value,
+                    "file": f.file,
+                    "line": f.line,
+                    "description": f.description,
+                    "suggestion": f.suggestion,
+                    "confidence": f.confidence,
+                }
+                for f in self.findings
+            ],
+        }
+
+    def to_json(self) -> str:
+        return json.dumps(self.to_dict(), indent=2)
 
 
 # ── Core Result Types ────────────────────────────────────────────

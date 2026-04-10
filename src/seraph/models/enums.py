@@ -14,6 +14,7 @@ class Grade(str, Enum):
     D = "D"
     F = "F"
     VACUOUS = "VACUOUS"
+    INCOMPLETE = "INCOMPLETE"
 
     @classmethod
     def from_score(
@@ -67,3 +68,19 @@ class MutantStatus(str, Enum):
     TIMEOUT = "timeout"
     ERROR = "error"
     SKIPPED = "skipped"
+
+
+class Verdict(str, Enum):
+    """Verdict from a pre-write or pre-commit gate."""
+
+    ALLOW = "ALLOW"
+    BLOCK = "BLOCK"
+
+
+class CheckCategory(str, Enum):
+    """Category of a Tier 1 fast check."""
+
+    IMPORT_VALIDATION = "import_validation"
+    SECURITY_SURFACE = "security_surface"
+    ESCALATION = "escalation"
+    SPEC_DRIFT = "spec_drift"

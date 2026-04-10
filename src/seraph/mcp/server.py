@@ -6,10 +6,12 @@ import os
 from pathlib import Path
 
 from seraph.config import SeraphConfig
+from seraph.core.checks import run_checks
 from seraph.core.engine import SeraphEngine
 from seraph.core.store import SeraphStore
 from seraph.mcp.formatters import (
     format_assessment,
+    format_check_result,
     format_feedback_response,
     format_history,
     format_mutations,
@@ -40,6 +42,42 @@ def create_server():
         "seraph",
         instructions="Verification intelligence for AI-generated code",
     )
+
+    @mcp.tool()
+    def seraph_check(
+        file_path: str,
+        content: str,
+        diff: str = "",
+        task_description: str = "",
+        repo_root: str = "",
+    ) -> str:
+        """Tier 1 fast pre-write checks on a file.
+
+        Runs import validation, security surface scan, escalation detection,
+        and spec drift analysis. Returns structured findings or ALLOW verdict.
+        Designed for <500ms latency.
+
+        Args:
+            file_path: Relative path to the file being checked.
+            content: Full file content (after proposed write/edit).
+            diff: Optional unified diff of the change.
+            task_description: Optional task description for spec drift detection.
+            repo_root: Explicit repo path (use when CWD doesn't match git root).
+        """
+        repo_path = Path(repo_root).resolve() if repo_root else _get_repo_path()
+        config = SeraphConfig.load(repo_path)
+        try:
+            result = run_checks(
+                file_path=file_path,
+                content=content,
+                diff=diff,
+                task_description=task_description,
+            )
+            return format_check_result(
+                result, max_chars=config.pipeline.max_output_chars,
+            )
+        except Exception as exc:
+            return f"Check failed: {exc}"
 
     @mcp.tool()
     def seraph_assess(
