@@ -84,3 +84,20 @@ class CheckCategory(str, Enum):
     SECURITY_SURFACE = "security_surface"
     ESCALATION = "escalation"
     SPEC_DRIFT = "spec_drift"
+
+
+class GateVerdict(str, Enum):
+    """Verdict from a Tier 2 pre-commit gate."""
+
+    ACCEPT = "ACCEPT"
+    ACCEPT_WITH_WARNINGS = "ACCEPT_WITH_WARNINGS"
+    REJECT = "REJECT"
+    PARTIAL = "PARTIAL"
+
+
+class GateSource(str, Enum):
+    """Source of a gate finding."""
+
+    MUTATION = "mutation"
+    SPEC_COMPLIANCE = "spec_compliance"
+    PROPERTY = "property"

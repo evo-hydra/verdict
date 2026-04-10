@@ -8,11 +8,13 @@ from pathlib import Path
 from seraph.config import SeraphConfig
 from seraph.core.checks import run_checks
 from seraph.core.engine import SeraphEngine
+from seraph.core.gate import run_gate
 from seraph.core.store import SeraphStore
 from seraph.mcp.formatters import (
     format_assessment,
     format_check_result,
     format_feedback_response,
+    format_gate_result,
     format_history,
     format_mutations,
 )
@@ -78,6 +80,46 @@ def create_server():
             )
         except Exception as exc:
             return f"Check failed: {exc}"
+
+    @mcp.tool()
+    def seraph_gate(
+        diff: str,
+        task_description: str = "",
+        test_cmd: str = "pytest",
+        max_mutants: int = 10,
+        repo_root: str = "",
+    ) -> str:
+        """Tier 2 pre-commit verification gate.
+
+        Runs targeted mutation testing on changed lines and spec compliance
+        checks. Returns structured verdict: ACCEPT, ACCEPT_WITH_WARNINGS,
+        REJECT, or PARTIAL. Designed for <30s latency.
+
+        Surviving mutants are reported as questions: "Your code still passes
+        tests if X is changed to Y. Is that intentional?"
+
+        Args:
+            diff: Unified diff of staged changes (from git diff --cached).
+            task_description: Task/plan description for spec compliance checks.
+            test_cmd: Test command to run (default: pytest).
+            max_mutants: Maximum mutants to generate (default: 10).
+            repo_root: Explicit repo path (use when CWD doesn't match git root).
+        """
+        repo_path = Path(repo_root).resolve() if repo_root else _get_repo_path()
+        config = SeraphConfig.load(repo_path)
+        try:
+            result = run_gate(
+                repo_path=repo_path,
+                diff=diff,
+                task_description=task_description,
+                test_cmd=test_cmd,
+                max_mutants=max_mutants,
+            )
+            return format_gate_result(
+                result, max_chars=config.pipeline.max_output_chars,
+            )
+        except Exception as exc:
+            return f"Gate failed: {exc}"
 
     @mcp.tool()
     def seraph_assess(

@@ -11,6 +11,8 @@ from seraph.models.enums import (
     AnalyzerType,
     CheckCategory,
     FeedbackOutcome,
+    GateSource,
+    GateVerdict,
     Grade,
     MutantStatus,
     Severity,
@@ -62,6 +64,58 @@ class CheckResult:
                 }
                 for f in self.findings
             ],
+        }
+
+    def to_json(self) -> str:
+        return json.dumps(self.to_dict(), indent=2)
+
+
+# ── Tier 2 Gate Types ──────────────────────────────────────────
+
+
+@dataclass
+class GateFinding:
+    """A single finding from a Tier 2 gate check."""
+
+    source: GateSource = GateSource.MUTATION
+    file: str = ""
+    line: int = 0
+    description: str = ""
+    suggestion: str = ""
+    confidence: float = 0.9
+    mutant_code: str = ""  # for mutation findings: the mutated line
+
+
+@dataclass
+class GateResult:
+    """Result of Tier 2 pre-commit gate."""
+
+    verdict: GateVerdict = GateVerdict.ACCEPT
+    findings: list[GateFinding] = field(default_factory=list)
+    mutation_score: float = 100.0
+    mutants_tested: int = 0
+    mutants_survived: int = 0
+    attempt: int = 1  # trajectory tracking
+
+    def to_dict(self) -> dict:
+        return {
+            "verdict": self.verdict.value,
+            "findings": [
+                {
+                    "source": f.source.value,
+                    "file": f.file,
+                    "line": f.line,
+                    "description": f.description,
+                    "suggestion": f.suggestion,
+                    "confidence": f.confidence,
+                    "mutant_code": f.mutant_code,
+                }
+                for f in self.findings
+            ],
+            "mutation_score": round(self.mutation_score, 1),
+            "mutants_tested": self.mutants_tested,
+            "mutants_survived": self.mutants_survived,
+            "attempt": self.attempt,
         }
 
     def to_json(self) -> str:

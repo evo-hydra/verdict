@@ -133,6 +133,49 @@ def format_mutations(
     return _truncate("\n".join(lines), max_chars=max_chars)
 
 
+def format_gate_result(
+    result, *, max_chars: int = MAX_OUTPUT_CHARS
+) -> str:
+    """Format a Tier 2 gate result for LLM consumption.
+
+    Accepts a GateResult dataclass.
+    """
+    lines: list[str] = []
+
+    lines.append(f"## Seraph Gate: {result.verdict.value}")
+    lines.append(f"Mutation score: {result.mutation_score:.1f}%")
+    lines.append(
+        f"Mutants: {result.mutants_tested} tested, "
+        f"{result.mutants_survived} survived"
+    )
+    if result.attempt > 1:
+        lines.append(f"Attempt: {result.attempt}")
+    lines.append("")
+
+    if not result.findings:
+        lines.append("No findings — all mutants killed, spec compliant.")
+        return _truncate("\n".join(lines), max_chars=max_chars)
+
+    # Group findings by source
+    by_source: dict[str, list] = {}
+    for f in result.findings:
+        by_source.setdefault(f.source.value, []).append(f)
+
+    for source, findings in sorted(by_source.items()):
+        lines.append(f"### {source.replace('_', ' ').title()} ({len(findings)})")
+        for f in findings:
+            loc = f"| `{f.file}:{f.line}` " if f.file else ""
+            lines.append(f"- {loc}confidence={f.confidence:.0%}")
+            lines.append(f"  {f.description}")
+            if f.suggestion:
+                lines.append(f"  → {f.suggestion}")
+            if f.mutant_code:
+                lines.append(f"  Mutated: `{f.mutant_code}`")
+            lines.append("")
+
+    return _truncate("\n".join(lines), max_chars=max_chars)
+
+
 def format_check_result(
     result, *, max_chars: int = MAX_OUTPUT_CHARS
 ) -> str:
