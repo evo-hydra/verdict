@@ -380,3 +380,30 @@ class Feedback:
     outcome: FeedbackOutcome = field(default=FeedbackOutcome.ACCEPTED)
     context: str = ""
     created_at: str = field(default_factory=_utcnow)
+
+
+# ── Calibration Models ─────────────────────────────────────────
+
+
+@dataclass
+class Calibration:
+    """A false positive or false negative report for threshold tuning."""
+
+    id: str = field(default_factory=_new_id)
+    check_category: str = ""  # CheckCategory or GateSource value
+    finding_description: str = ""
+    is_false_positive: bool = True  # True=FP, False=FN
+    context: str = ""
+    created_at: str = field(default_factory=_utcnow)
+
+
+@dataclass
+class StoredCalibration:
+    """A calibration entry as persisted in SQLite."""
+
+    id: str = ""
+    check_category: str = ""
+    finding_description: str = ""
+    is_false_positive: bool = True
+    context: str = ""
+    created_at: str = ""

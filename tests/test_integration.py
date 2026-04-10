@@ -199,8 +199,8 @@ class TestEndToEnd:
 class TestMCPServerIntegration:
     """Test MCP server tool functions directly (without transport)."""
 
-    def test_mcp_assess_tool(self, tmp_path: Path):
-        """seraph_assess tool returns formatted markdown."""
+    def test_mcp_tool_interface(self, tmp_path: Path):
+        """New v2 MCP tools are registered."""
         try:
             import mcp  # noqa: F401
         except ImportError:
@@ -214,10 +214,14 @@ class TestMCPServerIntegration:
 
             # Access the tool function directly
             tools = {t.name: t for t in server._tool_manager.list_tools()}
-            assert "seraph_assess" in tools
-            assert "seraph_mutate" in tools
-            assert "seraph_history" in tools
-            assert "seraph_feedback" in tools
+            assert "seraph_check" in tools
+            assert "seraph_gate" in tools
+            assert "seraph_explain" in tools
+            assert "seraph_calibrate" in tools
+            assert "seraph_status" in tools
+            # Old tools removed
+            assert "seraph_assess" not in tools
+            assert "seraph_mutate" not in tools
 
     def test_mcp_history_empty(self, tmp_path: Path):
         """seraph_history returns empty message for new repo."""

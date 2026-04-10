@@ -11,10 +11,12 @@ from pathlib import Path
 from seraph.models.assessment import (
     AssessmentReport,
     BaselineResult,
+    Calibration,
     Feedback,
     MutationResult,
     StoredAssessment,
     StoredBaseline,
+    StoredCalibration,
     StoredFeedback,
     StoredMutation,
 )
@@ -22,7 +24,7 @@ from seraph.models.enums import FeedbackOutcome, Grade, MutantStatus
 
 logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 _SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS seraph_meta (
@@ -79,6 +81,17 @@ CREATE INDEX IF NOT EXISTS idx_assessments_created ON assessments(created_at DES
 CREATE INDEX IF NOT EXISTS idx_mutation_cache_assessment ON mutation_cache(assessment_id, file_path);
 CREATE INDEX IF NOT EXISTS idx_baselines_repo_created ON baselines(repo_path, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_feedback_assessment ON feedback(assessment_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS calibrations (
+    id                  TEXT PRIMARY KEY,
+    check_category      TEXT NOT NULL,
+    finding_description TEXT NOT NULL,
+    is_false_positive   INTEGER NOT NULL DEFAULT 1,
+    context             TEXT,
+    created_at          TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_calibrations_category ON calibrations(check_category, created_at DESC);
 """
 
 
@@ -97,11 +110,30 @@ def _migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_feedback_assessment ON feedback(assessment_id, created_at DESC)")
 
 
+def _migrate_v2_to_v3(conn: sqlite3.Connection) -> None:
+    """Add calibrations table for FP/FN threshold tuning."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS calibrations (
+            id                  TEXT PRIMARY KEY,
+            check_category      TEXT NOT NULL,
+            finding_description TEXT NOT NULL,
+            is_false_positive   INTEGER NOT NULL DEFAULT 1,
+            context             TEXT,
+            created_at          TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_calibrations_category "
+        "ON calibrations(check_category, created_at DESC)"
+    )
+
+
 _MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     1: _migrate_v1_to_v2,
+    2: _migrate_v2_to_v3,
 }
 
-_STATS_TABLES = frozenset({"assessments", "baselines", "mutation_cache", "feedback"})
+_STATS_TABLES = frozenset({"assessments", "baselines", "mutation_cache", "feedback", "calibrations"})
 
 
 class SeraphStore:
@@ -337,6 +369,68 @@ class SeraphStore:
                 id=r["id"],
                 assessment_id=r["assessment_id"],
                 outcome=r["outcome"],
+                context=r["context"] or "",
+                created_at=r["created_at"],
+            )
+            for r in cur.fetchall()
+        ]
+
+    # ── Calibrations ────────────────────────────────────────────
+
+    def save_calibration(self, cal: Calibration) -> None:
+        self.conn.execute(
+            """INSERT INTO calibrations
+               (id, check_category, finding_description, is_false_positive,
+                context, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (
+                cal.id,
+                cal.check_category,
+                cal.finding_description,
+                1 if cal.is_false_positive else 0,
+                cal.context,
+                cal.created_at,
+            ),
+        )
+        self.conn.commit()
+
+    def get_calibration_stats(self) -> dict[str, dict[str, int]]:
+        """Get FP/FN counts per check category."""
+        cur = self.conn.execute(
+            """SELECT check_category, is_false_positive, COUNT(*) as cnt
+               FROM calibrations GROUP BY check_category, is_false_positive"""
+        )
+        stats: dict[str, dict[str, int]] = {}
+        for row in cur.fetchall():
+            cat = row["check_category"]
+            if cat not in stats:
+                stats[cat] = {"fp": 0, "fn": 0}
+            if row["is_false_positive"]:
+                stats[cat]["fp"] = row["cnt"]
+            else:
+                stats[cat]["fn"] = row["cnt"]
+        return stats
+
+    def get_calibrations(
+        self, check_category: str | None = None, limit: int = 50
+    ) -> list[StoredCalibration]:
+        if check_category:
+            cur = self.conn.execute(
+                """SELECT * FROM calibrations WHERE check_category = ?
+                   ORDER BY created_at DESC LIMIT ?""",
+                (check_category, limit),
+            )
+        else:
+            cur = self.conn.execute(
+                "SELECT * FROM calibrations ORDER BY created_at DESC LIMIT ?",
+                (limit,),
+            )
+        return [
+            StoredCalibration(
+                id=r["id"],
+                check_category=r["check_category"],
+                finding_description=r["finding_description"],
+                is_false_positive=bool(r["is_false_positive"]),
                 context=r["context"] or "",
                 created_at=r["created_at"],
             )

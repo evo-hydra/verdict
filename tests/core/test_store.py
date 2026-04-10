@@ -218,12 +218,14 @@ class TestMigrationSystem:
         db_path = tmp_path / "version.db"
 
         # Create at version 1
-        with SeraphStore(db_path) as store:
-            pass
+        with patch("seraph.core.store.SCHEMA_VERSION", 1), \
+             patch.dict(_MIGRATIONS, {}, clear=True):
+            with SeraphStore(db_path) as store:
+                pass
 
         # Bump to version 2
         with patch("seraph.core.store.SCHEMA_VERSION", 2), \
-             patch.dict(_MIGRATIONS, {1: lambda conn: None}):
+             patch.dict(_MIGRATIONS, {1: lambda conn: None}, clear=True):
             with SeraphStore(db_path) as store:
                 cur = store.conn.execute(
                     "SELECT value FROM seraph_meta WHERE key = 'schema_version'"

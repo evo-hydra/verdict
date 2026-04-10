@@ -1,4 +1,12 @@
-"""Seraph MCP server — FastMCP with stdio transport."""
+"""Seraph MCP server — FastMCP with stdio transport.
+
+New 5-tool interface (v2):
+  seraph_check     — Tier 1 fast pre-write checks
+  seraph_gate      — Tier 2 pre-commit verification gate
+  seraph_explain   — Detailed explanation of a finding
+  seraph_calibrate — Report false positive/negative
+  seraph_status    — Gate pass/fail rates, calibration stats
+"""
 
 from __future__ import annotations
 
@@ -7,19 +15,16 @@ from pathlib import Path
 
 from seraph.config import SeraphConfig
 from seraph.core.checks import run_checks
-from seraph.core.engine import SeraphEngine
 from seraph.core.gate import run_gate
 from seraph.core.store import SeraphStore
 from seraph.mcp.formatters import (
-    format_assessment,
+    format_calibrate_response,
     format_check_result,
-    format_feedback_response,
+    format_explain,
     format_gate_result,
-    format_history,
-    format_mutations,
+    format_status,
 )
-from seraph.models.assessment import Feedback
-from seraph.models.enums import FeedbackOutcome
+from seraph.models.assessment import Calibration
 
 
 def _get_repo_path() -> Path:
@@ -122,134 +127,95 @@ def create_server():
             return f"Gate failed: {exc}"
 
     @mcp.tool()
-    def seraph_assess(
-        ref_before: str = "",
-        ref_after: str = "",
-        skip_baseline: bool = False,
-        skip_mutations: bool = False,
-        repo_root: str = "",
+    def seraph_explain(
+        check_category: str,
+        description: str,
+        file_path: str = "",
+        line: int = 0,
+        confidence: float = 0.0,
     ) -> str:
-        """Run full assessment pipeline on current diff or specified refs.
+        """Explain a finding in detail.
 
-        Analyzes code changes through mutation testing, static analysis,
-        and Sentinel project intelligence to produce a multi-metric grade.
+        Given a finding from seraph_check or seraph_gate, returns a detailed
+        explanation: what the check detected, why it matters, what the fix
+        should look like, and what the confidence score means.
 
         Args:
-            ref_before: Git ref before changes (default: HEAD)
-            ref_after: Git ref after changes (default: working tree)
-            skip_baseline: Skip flakiness baseline (faster)
-            skip_mutations: Skip mutation testing (much faster)
-            repo_root: Explicit repo path (use when CWD doesn't match git root)
+            check_category: The check type (e.g., "security_surface", "mutation").
+            description: The finding description from the check/gate result.
+            file_path: File where the finding was detected.
+            line: Line number of the finding.
+            confidence: Confidence score of the finding.
         """
-        repo_path = Path(repo_root).resolve() if repo_root else _get_repo_path()
-        config = SeraphConfig.load(repo_path)
-        try:
-            with _get_store(repo_path, config) as store:
-                engine = SeraphEngine(
-                    store,
-                    config=config,
-                    skip_baseline=skip_baseline,
-                    skip_mutations=skip_mutations,
-                )
-                report = engine.assess(
-                    repo_path,
-                    ref_before=ref_before or None,
-                    ref_after=ref_after or None,
-                )
-                return format_assessment(
-                    report.to_dict(), max_chars=config.pipeline.max_output_chars
-                )
-        except Exception as exc:
-            return f"Assessment failed: {exc}"
+        return format_explain(
+            check_category=check_category,
+            description=description,
+            file_path=file_path,
+            line=line,
+            confidence=confidence,
+        )
 
     @mcp.tool()
-    def seraph_mutate(
-        ref_before: str = "",
-        ref_after: str = "",
-        repo_root: str = "",
-    ) -> str:
-        """Run mutation testing only on changed files.
-
-        A focused subset of the full assessment that only runs mutmut
-        on files in the diff.
-
-        Args:
-            ref_before: Git ref before changes (default: HEAD)
-            ref_after: Git ref after changes (default: working tree)
-            repo_root: Explicit repo path (use when CWD doesn't match git root)
-        """
-        repo_path = Path(repo_root).resolve() if repo_root else _get_repo_path()
-        config = SeraphConfig.load(repo_path)
-        try:
-            with _get_store(repo_path, config) as store:
-                engine = SeraphEngine(store, config=config)
-                report = engine.mutate_only(
-                    repo_path,
-                    ref_before=ref_before or None,
-                    ref_after=ref_after or None,
-                )
-                return format_mutations(
-                    report.mutations, report.mutation_score,
-                    max_chars=config.pipeline.max_output_chars,
-                )
-        except Exception as exc:
-            return f"Mutation testing failed: {exc}"
-
-    @mcp.tool()
-    def seraph_history(
-        limit: int = 10,
-        offset: int = 0,
-    ) -> str:
-        """Query past assessments with pagination.
-
-        Args:
-            limit: Maximum number of results (default 10)
-            offset: Number of results to skip (default 0)
-        """
-        repo_path = _get_repo_path()
-        config = SeraphConfig.load(repo_path)
-        with _get_store(repo_path, config) as store:
-            assessments = store.get_assessments(limit=limit, offset=offset)
-            return format_history(
-                assessments, max_chars=config.pipeline.max_output_chars
-            )
-
-    @mcp.tool()
-    def seraph_feedback(
-        assessment_id: str,
-        outcome: str,
+    def seraph_calibrate(
+        check_category: str,
+        finding_description: str,
+        is_false_positive: bool = True,
         context: str = "",
+        repo_root: str = "",
     ) -> str:
-        """Submit feedback on an assessment.
+        """Report a false positive or false negative to tune thresholds.
 
-        Helps Seraph learn which assessments are useful.
+        Over time, checks with high FP rates get their confidence thresholds
+        raised automatically.
 
         Args:
-            assessment_id: The assessment ID to give feedback on
-            outcome: One of: accepted, rejected, modified
-            context: Optional explanation
+            check_category: The check type (e.g., "security_surface", "mutation").
+            finding_description: The finding that was FP/FN.
+            is_false_positive: True if false positive, False if false negative.
+            context: Optional explanation of why this is FP/FN.
+            repo_root: Explicit repo path (use when CWD doesn't match git root).
         """
-        repo_path = _get_repo_path()
+        repo_path = Path(repo_root).resolve() if repo_root else _get_repo_path()
         config = SeraphConfig.load(repo_path)
-        with _get_store(repo_path, config) as store:
-            # Validate outcome
-            try:
-                fb_outcome = FeedbackOutcome(outcome)
-            except ValueError:
-                return f"Invalid outcome '{outcome}'. Must be: accepted, rejected, or modified"
-
-            # Verify assessment exists
-            assessment = store.get_assessment(assessment_id)
-            if not assessment:
-                return f"Assessment '{assessment_id}' not found"
-
-            fb = Feedback(
-                assessment_id=assessment_id,
-                outcome=fb_outcome,
+        try:
+            cal = Calibration(
+                check_category=check_category,
+                finding_description=finding_description,
+                is_false_positive=is_false_positive,
                 context=context,
             )
-            store.save_feedback(fb)
-            return format_feedback_response(assessment_id, outcome)
+            with _get_store(repo_path, config) as store:
+                store.save_calibration(cal)
+            return format_calibrate_response(
+                check_category, is_false_positive,
+            )
+        except Exception as exc:
+            return f"Calibration failed: {exc}"
+
+    @mcp.tool()
+    def seraph_status(
+        repo_root: str = "",
+    ) -> str:
+        """Gate pass/fail rates, calibration stats, and system health.
+
+        Returns aggregate statistics on check/gate verdicts and
+        FP/FN calibration reports.
+
+        Args:
+            repo_root: Explicit repo path (use when CWD doesn't match git root).
+        """
+        repo_path = Path(repo_root).resolve() if repo_root else _get_repo_path()
+        config = SeraphConfig.load(repo_path)
+        try:
+            with _get_store(repo_path, config) as store:
+                cal_stats = store.get_calibration_stats()
+                table_stats = store.stats()
+            return format_status(
+                calibration_stats=cal_stats,
+                table_stats=table_stats,
+            )
+        except Exception as exc:
+            return f"Status failed: {exc}"
 
     return mcp
 
