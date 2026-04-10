@@ -12,11 +12,17 @@ Claude Code hook protocol:
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 
 from seraph.core.gate import run_gate
 from seraph.models.enums import GateVerdict
+
+# Match 'git' followed eventually by 'commit' subcommand,
+# handling flags/options between them (e.g., git -C repo commit,
+# git -c user.name=x commit, git --no-pager commit)
+_GIT_COMMIT_RE = re.compile(r"\bgit\b.*\bcommit\b")
 
 
 def main() -> None:
@@ -34,9 +40,9 @@ def main() -> None:
     except json.JSONDecodeError:
         sys.exit(0)
 
-    # Check if this is a Bash command containing 'git commit'
+    # Check if this is a Bash command containing a git commit invocation
     command = tool_input.get("command", "")
-    if "git commit" not in command:
+    if not _GIT_COMMIT_RE.search(command):
         sys.exit(0)
 
     # Get staged diff

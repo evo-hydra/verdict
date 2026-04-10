@@ -202,6 +202,7 @@ def run_gate(
 
     # Step 1: Mutation testing
     mutation_result = MutationTestResult()
+    mutation_crashed = False
     try:
         mutation_result = run_mutation_testing(
             repo, diff, test_cmd, max_mutants, timeout_per_mutant,
@@ -225,6 +226,7 @@ def run_gate(
             ))
     except Exception:
         logger.exception("Step 1 (Mutation Testing) failed")
+        mutation_crashed = True
 
     # Step 2: Spec compliance
     try:
@@ -237,6 +239,7 @@ def run_gate(
     verdict = _determine_verdict(
         mutation_result, all_findings,
         mutation_reject_threshold, mutation_warn_threshold,
+        mutation_crashed=mutation_crashed,
     )
 
     result = GateResult(
@@ -270,11 +273,17 @@ def _determine_verdict(
     findings: list[GateFinding],
     reject_threshold: float,
     warn_threshold: float,
+    *,
+    mutation_crashed: bool = False,
 ) -> GateVerdict:
     """Determine gate verdict based on mutation score and findings."""
     spec_findings = [f for f in findings if f.source == GateSource.SPEC_COMPLIANCE]
 
     tested = len(mutation_result.killed) + len(mutation_result.survived)
+
+    # Verifier crash = degraded confidence, never clean ACCEPT
+    if mutation_crashed:
+        return GateVerdict.ACCEPT_WITH_WARNINGS
 
     # No mutants generated = no test coverage signal → ACCEPT
     if tested == 0 and not spec_findings:

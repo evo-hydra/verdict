@@ -38,11 +38,9 @@ def main() -> None:
     file_path = tool_input.get("file_path", "")
     content = tool_input.get("content", "")
 
-    # For Edit tool, content might be in new_string (partial edit)
-    # We only check full writes — edits are partial and harder to validate
+    # For Edit tool, check new_string as the content being introduced
     if not content and "new_string" in tool_input:
-        # Skip partial edits — too much context needed
-        sys.exit(0)
+        content = tool_input["new_string"]
 
     if not file_path or not content:
         sys.exit(0)

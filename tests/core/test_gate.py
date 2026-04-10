@@ -6,6 +6,8 @@ import textwrap
 from pathlib import Path
 from unittest.mock import patch
 
+from unittest.mock import patch
+
 from seraph.core.gate import (
     GateTrajectory,
     _check_spec_compliance,
@@ -62,6 +64,17 @@ def test_spec_compliance_scope_creep():
     diff = "\n".join([f"+++ b/file{i}.py\n@@ -1 +1 @@\n+x" for i in range(10)])
     findings = _check_spec_compliance(diff, "Fix bug in main.py")
     assert any("scope creep" in f.description for f in findings)
+
+
+# ── Fail-open Regression ──────────────────────────────────────
+
+
+def test_gate_does_not_accept_on_mutation_crash():
+    """If mutation testing crashes, verdict must not be ACCEPT."""
+    with patch("seraph.core.gate.run_mutation_testing", side_effect=RuntimeError("boom")):
+        result = run_gate("/tmp", diff="+++ b/x.py\n@@ -1 +1 @@\n+x=1")
+    assert result.verdict != GateVerdict.ACCEPT
+    assert result.verdict == GateVerdict.ACCEPT_WITH_WARNINGS
 
 
 # ── Trajectory Tracking ───────────────────────────────────────

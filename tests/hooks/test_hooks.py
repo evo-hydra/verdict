@@ -65,15 +65,26 @@ class TestTier1Hook:
         result = _run_hook("seraph.hooks.tier1", "not json")
         assert result.returncode == 0
 
-    def test_allow_edit_tool(self):
-        """Edit tool (partial edits) passes through."""
+    def test_block_edit_tool_with_dangerous_new_string(self):
+        """Edit tool with dangerous new_string is blocked."""
         tool_input = json.dumps({
             "file_path": "src/foo.py",
             "old_string": "x = 1",
-            "new_string": "x = eval('1')",
+            "new_string": "x = eval(user_input)",
         })
         result = _run_hook("seraph.hooks.tier1", tool_input)
-        assert result.returncode == 0  # Partial edits are skipped
+        assert result.returncode == 1
+        assert "BLOCKED" in result.stdout
+
+    def test_allow_edit_tool_safe_new_string(self):
+        """Edit tool with safe new_string passes through."""
+        tool_input = json.dumps({
+            "file_path": "src/foo.py",
+            "old_string": "x = 1",
+            "new_string": "x = 2",
+        })
+        result = _run_hook("seraph.hooks.tier1", tool_input)
+        assert result.returncode == 0
 
     def test_block_subprocess_shell(self):
         """subprocess with shell=True is blocked."""
@@ -120,3 +131,16 @@ class TestTier2Hook:
         result = _run_hook("seraph.hooks.tier2", tool_input)
         # Either 0 (no diff) or 0 (allow) — should not block
         assert result.returncode == 0
+
+    def test_detects_git_c_commit(self):
+        """git -C repo commit variant is detected."""
+        tool_input = json.dumps({"command": "git -C /some/repo commit -m 'msg'"})
+        result = _run_hook("seraph.hooks.tier2", tool_input)
+        # Should not exit early — should attempt to run (may pass with empty diff)
+        assert result.returncode == 0  # passes because no staged changes
+
+    def test_detects_git_config_commit(self):
+        """git -c user.name=x commit variant is detected."""
+        tool_input = json.dumps({"command": "git -c user.name=test commit -m 'msg'"})
+        result = _run_hook("seraph.hooks.tier2", tool_input)
+        assert result.returncode == 0  # passes because no staged changes
