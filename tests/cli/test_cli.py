@@ -26,7 +26,9 @@ def cli_store(tmp_path: Path):
 class TestCLI:
     def test_no_args_shows_help(self):
         result = runner.invoke(app, [])
-        assert result.exit_code == 0
+        # Typer >= 0.12 exits with code 2 when no command is given (no_args_is_help),
+        # older versions returned 0. Accept both; what matters is that help is printed.
+        assert result.exit_code in (0, 2)
         assert "Verification intelligence" in result.stdout or "Usage" in result.stdout
 
     def test_history_empty(self, cli_store):

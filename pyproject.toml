@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "seraph-ai"
-version = "0.1.1"
+version = "0.2.0"
 description = "Code quality gate — mutation testing, static analysis, and risk scoring for AI-generated code"
 readme = "README.md"
 license = {text = "MIT"}
@@ -47,6 +47,31 @@ Issues = "https://github.com/evo-hydra/seraph/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/seraph"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/seraph",
+    "tests",
+    "README.md",
+    "LICENSE",
+    "pyproject.toml",
+]
+exclude = [
+    "/.plan_file",
+    "/plans",
+    "/.env",
+    "/.venv",
+    "/dist",
+    "/build",
+    "/.pytest_cache",
+    "/.ruff_cache",
+    "/.mypy_cache",
+    "/.niobe",
+    "/.sentinel",
+    "/.seraph",
+    "**/__pycache__",
+    "**/.DS_Store",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
