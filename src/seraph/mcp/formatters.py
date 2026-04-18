@@ -143,11 +143,17 @@ def format_gate_result(
     lines: list[str] = []
 
     lines.append(f"## Seraph Gate: {result.verdict.value}")
-    lines.append(f"Mutation score: {result.mutation_score:.1f}%")
-    lines.append(
-        f"Mutants: {result.mutants_tested} tested, "
-        f"{result.mutants_survived} survived"
-    )
+    # When no mutants were generated, the score is vacuous — 100% of zero.
+    # Report N/A instead of lying about a perfect score on a non-mutable diff.
+    if result.mutants_tested == 0:
+        lines.append("Mutation score: N/A — no mutable code in staged diff")
+        lines.append("Mutants: 0 tested")
+    else:
+        lines.append(f"Mutation score: {result.mutation_score:.1f}%")
+        lines.append(
+            f"Mutants: {result.mutants_tested} tested, "
+            f"{result.mutants_survived} survived"
+        )
     if result.attempt > 1:
         lines.append(f"Attempt: {result.attempt}")
     lines.append("")

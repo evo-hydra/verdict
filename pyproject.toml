@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "seraph-ai"
-version = "0.2.0"
+version = "0.2.1"
 description = "Code quality gate — mutation testing, static analysis, and risk scoring for AI-generated code"
 readme = "README.md"
 license = {text = "MIT"}
